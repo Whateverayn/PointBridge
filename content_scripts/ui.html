@@ -1,0 +1,167 @@
+<link rel="stylesheet" href="https://unpkg.com/98.css">
+<style>
+    .window {
+        width: 400px;
+        /* Initial width */
+        min-width: 250px;
+        display: flex;
+        flex-direction: column;
+        box-sizing: border-box;
+        /* Handle padding/borders in width */
+    }
+
+    .window-body {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        /* Prevent body overflow from breaking window */
+    }
+
+    .sunken-panel {
+        flex: 1;
+        overflow: auto;
+        background: white;
+    }
+
+    table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+
+    .title-bar-text {
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        margin-right: 16px;
+        /* Space for controls */
+    }
+
+    /* Maximize fix */
+    :host {
+        /* Ensure Shadow DOM host doesn't interfere */
+        display: block;
+    }
+</style>
+
+<div class="window">
+    <div class="title-bar">
+        <div class="title-bar-text">PointBridge</div>
+        <div class="title-bar-controls">
+            <button aria-label="Minimize"></button>
+            <button aria-label="Maximize"></button>
+            <button aria-label="Close" id="close-btn"></button>
+        </div>
+    </div>
+    <div class="window-body">
+        <div class="sunken-panel">
+            <table id="data-table" class="interactive">
+                <thead>
+                    <tr>
+                        <th>デイト</th>
+                        <th>ロケーション</th>
+                        <th>ディテール</th>
+                        <th>ゲイン (P)</th>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </div>
+        <section class="field-row" style="justify-content: flex-end; margin-top: 8px;">
+            <button id="scan-btn">リ・スキャン</button>
+            <button id="send-btn">GASへプッシュ</button>
+            <button id="settings-btn" title="プリファレンス">プリファレンス</button>
+        </section>
+    </div>
+    <div class="status-bar">
+        <p class="status-bar-field" id="status-text">レディ</p>
+    </div>
+
+    <!-- Resize Handles -->
+    <div class="resize-handle n"></div>
+    <div class="resize-handle e"></div>
+    <div class="resize-handle s"></div>
+    <div class="resize-handle w"></div>
+    <div class="resize-handle ne"></div>
+    <div class="resize-handle nw"></div>
+    <div class="resize-handle se"></div>
+    <div class="resize-handle sw"></div>
+</div>
+
+<style>
+    /* Resize Handle Styles */
+    .resize-handle {
+        position: absolute;
+        z-index: 100;
+    }
+
+    .resize-handle.n {
+        top: -5px;
+        left: 0;
+        right: 0;
+        height: 10px;
+        cursor: ns-resize;
+    }
+
+    .resize-handle.s {
+        bottom: -5px;
+        left: 0;
+        right: 0;
+        height: 10px;
+        cursor: ns-resize;
+    }
+
+    .resize-handle.e {
+        top: 0;
+        right: -5px;
+        bottom: 0;
+        width: 10px;
+        cursor: ew-resize;
+    }
+
+    .resize-handle.w {
+        top: 0;
+        left: -5px;
+        bottom: 0;
+        width: 10px;
+        cursor: ew-resize;
+    }
+
+    .resize-handle.ne {
+        top: -5px;
+        right: -5px;
+        width: 15px;
+        height: 15px;
+        cursor: ne-resize;
+    }
+
+    .resize-handle.nw {
+        top: -5px;
+        left: -5px;
+        width: 15px;
+        height: 15px;
+        cursor: nw-resize;
+    }
+
+    .resize-handle.se {
+        bottom: -5px;
+        right: -5px;
+        width: 15px;
+        height: 15px;
+        cursor: se-resize;
+    }
+
+    .resize-handle.sw {
+        bottom: -5px;
+        left: -5px;
+        width: 15px;
+        height: 15px;
+        cursor: sw-resize;
+    }
+
+    .title-bar-controls button {
+        z-index: 200;
+        /* Ensure buttons are above resize handles */
+        position: relative;
+    }
+</style>

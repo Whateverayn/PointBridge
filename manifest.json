@@ -1,0 +1,51 @@
+{
+    "manifest_version": 3,
+    "name": "PointBridge",
+    "version": "1.0.0",
+    "description": "各社のポイント・ヒストリをエクストラクトし, GASへプッシュします.",
+    "permissions": [
+        "activeTab",
+        "scripting",
+        "storage",
+        "contextMenus"
+    ],
+    "host_permissions": [
+        "*://icoca.jr-odekake.net/*",
+        "https://script.google.com/*"
+    ],
+    "action": {
+        "default_title": "PointBridge (Options)"
+    },
+    "options_ui": {
+        "page": "options/index.html",
+        "open_in_tab": false
+    },
+    "content_scripts": [
+        {
+            "matches": [
+                "*://icoca.jr-odekake.net/pc/pointref_search.do*"
+            ],
+            "js": [
+                "content_scripts/loader.js",
+                "content_scripts/ui.js"
+            ]
+        }
+    ],
+    "background": {
+        "scripts": [
+            "background/main.js"
+        ]
+    },
+    "web_accessible_resources": [
+        {
+            "resources": [
+                "parsers/interface.js",
+                "parsers/wester/parser.js",
+                "content_scripts/ui.html"
+            ],
+            "matches": [
+                "*://icoca.jr-odekake.net/*"
+            ]
+        }
+    ]
+}
