@@ -3,18 +3,24 @@ document.addEventListener('DOMContentLoaded', async () => {
     const saveBtn = document.getElementById('saveBtn');
     const status = document.getElementById('status');
 
-    // Load saved URL
-    const { gasUrl } = await chrome.storage.local.get('gasUrl');
+    const autoSendCheckbox = document.getElementById('autoSend');
+
+    // Load saved settings
+    const { gasUrl, autoSend } = await chrome.storage.local.get(['gasUrl', 'autoSend']);
     if (gasUrl) {
         gasUrlInput.value = gasUrl;
     }
+    if (autoSend) {
+        autoSendCheckbox.checked = autoSend;
+    }
 
-    // Save URL
+    // Save settings
     saveBtn.addEventListener('click', async () => {
         const url = gasUrlInput.value.trim();
+        const isAutoSend = autoSendCheckbox.checked;
 
         if (!url) {
-            status.textContent = "URLのインプットがリクワイアされています.";
+            showStatus("URLのインプットがリクワイアされています.", "var(--danger-color)");
             status.style.color = "var(--danger-color)";
             return;
         }
@@ -25,7 +31,10 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
 
         try {
-            await chrome.storage.local.set({ gasUrl: url });
+            await chrome.storage.local.set({
+                gasUrl: url,
+                autoSend: isAutoSend
+            });
             showStatus("コンフィグレーションのセーブは完了されました.", "var(--success-color)");
         } catch (e) {
             showStatus("セーブ・プロセス中に, アンエクスペクテッド・エラーがオカーしました.", "var(--danger-color)");

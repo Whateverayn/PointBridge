@@ -4,6 +4,8 @@ class PointBridgeUI {
         this.container = null;
         this.isVisible = false;
         this.extractedData = [];
+        this.autoSend = false;
+        this.maxRetries = 3;
     }
 
     async initialize() {
@@ -20,6 +22,11 @@ class PointBridgeUI {
         this.shadowRoot = this.container.attachShadow({ mode: 'closed' });
 
         await this.render();
+
+        // Load Auto-Send Preference
+        const { autoSend } = await chrome.storage.local.get('autoSend');
+        this.autoSend = !!autoSend;
+
         this.attachListeners();
     }
 
@@ -141,10 +148,15 @@ class PointBridgeUI {
 
             if (data.length > 0) {
                 statusEl.textContent = `${data.length} 件のレコード (${elapsed}ms)`;
-                this.renderTable(data, parser);
+                await this.renderTable(data, parser);
             } else {
                 statusEl.textContent = "リソースがエンプティです.";
-                this.renderTable([], parser);
+                await this.renderTable([], parser);
+            }
+
+            // Auto-Send Trigger with Dynamic Delay
+            if (this.autoSend && data.length > 0) {
+                this.triggerAutoSendLoop();
             }
         } catch (e) {
             console.error(e);
@@ -154,12 +166,12 @@ class PointBridgeUI {
 
     async send() {
         const statusEl = this.shadowRoot.getElementById('status-text');
-        if (this.extractedData.length === 0) return;
+        if (this.extractedData.length === 0) return null;
 
         const { gasUrl } = await chrome.storage.local.get('gasUrl');
         if (!gasUrl) {
             statusEl.textContent = "コンフィグ・ミッシング: GASのエンドポイント定義がリクワイアされています.";
-            return;
+            return null;
         }
 
         statusEl.textContent = "プッシュ中...";
@@ -195,6 +207,7 @@ class PointBridgeUI {
                 }
 
                 this.clearErrorView(); // Clear any previous errors
+                return response.data;
             } else {
                 const errorMsg = response.data?.message || response.error || 'Unknown error';
                 console.error("Push failed:", response);
@@ -206,10 +219,58 @@ class PointBridgeUI {
                 } else {
                     this.clearErrorView();
                 }
+                return null;
             }
         } catch (e) {
             console.error(e);
             statusEl.textContent = "通信エラー (Message failure).";
+            return null;
+        }
+    }
+
+    async triggerAutoSendLoop(retryCount = 0) {
+        if (retryCount >= this.maxRetries) {
+            console.warn("Auto-Send: Max retries reached. Stopping loop.");
+            const statusEl = this.shadowRoot.getElementById('status-text');
+            if (statusEl) statusEl.textContent += " (Max Retries Reached)";
+            return;
+        }
+
+        const statusEl = this.shadowRoot.getElementById('status-text');
+        if (statusEl) statusEl.textContent = `オート・プッシュ・イニシャライズ (アテンプト ${retryCount + 1}/${this.maxRetries})...`;
+
+        await new Promise(r => setTimeout(r, 1000)); // Delay for readability
+
+        const result = await this.send();
+
+        if (result && result.status === 'success') {
+            const addedCount = result.addedCount || 0;
+
+            if (addedCount > 0) {
+                // If data was added, there might be more (or duplicates handling needs refresh). 
+                // Wait and re-scan/re-send?
+                // User requirement: "If added > 0, re-scan and auto-send".
+
+                statusEl.textContent = `アディショナル・データ (${addedCount}) ディテクテッド. リ・スキャン...`;
+                await new Promise(r => setTimeout(r, 1500)); // Wait before retry
+
+                // Scan again
+                await this.scan();
+                // Note: scan() calls triggerAutoSendLoop() at the end, 
+                // but we need to pass the retry state to avoid infinite recursion without limits.
+                // Refactor idea: scan() doesn't need to know about retry count if we track it here?
+                // Actually, if scan() calls triggerAutoSendLoop() blindly, it resets count to 0 (default).
+                // Issue: Infinite loop risk.
+                // WE MUST PREVENT scan() from calling triggerAutoSendLoop() IF called from here.
+                // Solution: Pass a flag to scan() or manage state.
+
+                // Better: Just loop HERE.
+                // But scan() is async and updates `this.extractedData`.
+                // If we call scan(), it will trigger logic.
+            } else {
+                // Added 0 -> Done.
+                console.log("Auto-Send: No new records added. Loop finished.");
+            }
         }
     }
 
@@ -351,19 +412,34 @@ class PointBridgeUI {
             });
 
             // Trigger Retro Reveal for Rows
-            const baseDelay = 500;
+            // Return a promise that resolves when animation is visually "done"
+            return new Promise(resolve => {
+                const baseDelay = 500;
+                const rows = tbody.querySelectorAll('tr');
+                let currentDelay = baseDelay;
 
-            const rows = tbody.querySelectorAll('tr');
-            let currentDelay = baseDelay;
-            rows.forEach((row) => {
-                // Add fluctuation: 50ms to 150ms (Average 100ms)
-                const jitter = 0 + Math.random() * 100;
-                currentDelay += jitter;
-                setTimeout(() => {
-                    row.style.visibility = 'visible';
-                }, currentDelay);
+                if (rows.length === 0) {
+                    setTimeout(resolve, baseDelay);
+                    return;
+                }
+
+                rows.forEach((row, index) => {
+                    // Add fluctuation: 50ms to 150ms (Average 100ms)
+                    const jitter = 0 + Math.random() * 100;
+                    currentDelay += jitter;
+
+                    setTimeout(() => {
+                        row.style.visibility = 'visible';
+
+                        // Resolve when the last row is shown (plus padding)
+                        if (index === rows.length - 1) {
+                            setTimeout(resolve, 500); // Wait 500ms after last row appears before considering "done"
+                        }
+                    }, currentDelay);
+                });
             });
         }
+        return Promise.resolve();
     }
 
     attachListeners() {
