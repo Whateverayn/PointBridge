@@ -1,5 +1,5 @@
 (async () => {
-    console.log("PointBridge Loader: Loaded.");
+    // console.log("PointBridge Loader: Loaded.");
 
     // Dynamic import to use ES modules
     // Generic Parser Loader
@@ -26,16 +26,16 @@
 
             if (parser.isApplicable(window.location.href)) {
                 parserInstance = parser;
-                console.log(`PointBridge Loader: ${p.className} initialized.`);
+                // console.log(`PointBridge Loader: ${p.className} initialized.`);
                 break; // Stop after finding the first applicable parser
             }
         } catch (e) {
-            console.debug(`PointBridge Loader: Skipped ${p.name} parser (not applicable or failed load).`, e);
+            // console.debug(`PointBridge Loader: Skipped ${p.name} parser (not applicable or failed load).`, e);
         }
     }
 
     if (!parserInstance) {
-        console.log("PointBridge Loader: No applicable parser found for this page.");
+        // console.log("PointBridge Loader: No applicable parser found for this page.");
     }
 
     // Listen for messages from Popup

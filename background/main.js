@@ -3,7 +3,7 @@
 const MENU_ID = "point-bridge-start";
 
 chrome.runtime.onInstalled.addListener(() => {
-    console.log("PointBridge Installed.");
+    // console.log("PointBridge Installed.");
 
     chrome.contextMenus.create({
         id: MENU_ID,
@@ -16,12 +16,39 @@ chrome.runtime.onInstalled.addListener(() => {
     });
 });
 
-chrome.contextMenus.onClicked.addListener((info, tab) => {
+chrome.contextMenus.onClicked.addListener(async (info, tab) => {
     if (info.menuItemId === MENU_ID) {
         if (tab && tab.id) {
-            chrome.tabs.sendMessage(tab.id, { action: "toggle-ui" }).catch(err => {
-                console.warn("Could not send message to tab. Content script might not be loaded.", err);
-            });
+            // Helper function to send toggle command
+            const sendToggle = async () => {
+                try {
+                    await chrome.tabs.sendMessage(tab.id, { action: "toggle-ui" });
+                    return true;
+                } catch (e) {
+                    return false;
+                }
+            };
+
+            // Attempt 1: Try sending message (Fast path if already injected)
+            const success = await sendToggle();
+
+            if (!success) {
+                // console.debug("PointBridge: Content script not ready. Injecting...");
+                try {
+                    // Inject Scripts
+                    await chrome.scripting.executeScript({
+                        target: { tabId: tab.id },
+                        files: ["content_scripts/loader.js", "content_scripts/ui.js"]
+                    });
+
+                    // Attempt 2: Send message again after injection
+                    // Give a tiny buffer for evaluation if needed, though executeScript awaits completion
+                    await sendToggle();
+                    // console.debug("PointBridge: Injected and toggled.");
+                } catch (err) {
+                    console.error("PointBridge: Injection failed.", err);
+                }
+            }
         }
     }
 });

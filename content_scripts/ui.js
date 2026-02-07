@@ -17,11 +17,10 @@ class PointBridgeUI {
         this.container.style.display = 'none';
 
         document.body.appendChild(this.container);
-        this.shadowRoot = this.container.attachShadow({ mode: 'open' });
+        this.shadowRoot = this.container.attachShadow({ mode: 'closed' });
 
         await this.render();
         this.attachListeners();
-        console.log("PointBridge UI has been injected.");
     }
 
     async toggle() {
@@ -30,8 +29,57 @@ class PointBridgeUI {
         this.container.style.display = this.isVisible ? 'block' : 'none';
 
         if (this.isVisible) {
+            this.revealUI(); // Start retro animation
             this.scan();
         }
+    }
+
+    revealUI() {
+        const titleBar = this.shadowRoot.querySelector('.title-bar');
+        const body = this.shadowRoot.querySelector('.window-body');
+        const status = this.shadowRoot.querySelector('.status-bar');
+
+        // Detailed elements for granular reveal
+        const buttons = this.shadowRoot.querySelectorAll('button');
+        const tableContainer = this.shadowRoot.querySelector('.sunken-panel');
+        // Rows are handled in renderTable
+
+        // Initial Reset (Hide all)
+        const hide = (el) => { if (el) el.style.visibility = 'hidden'; };
+        const show = (el) => { if (el) el.style.visibility = 'visible'; };
+
+        hide(titleBar);
+        hide(body);
+        hide(status);
+        buttons.forEach(hide);
+        hide(tableContainer);
+
+        // Timeline
+        // T+0: Window Frame (Background) - Already visible via display:block
+
+        // T+50: Title Bar & Body Background
+        setTimeout(() => {
+            show(titleBar);
+            show(body);
+        }, 50);
+
+        // T+150: Status Bar
+        setTimeout(() => {
+            show(status);
+        }, 150);
+
+        // T+250: Buttons (Controls & Header buttons)
+        setTimeout(() => {
+            buttons.forEach(show);
+        }, 250);
+
+        // T+350: Table Frame (Sunken Panel)
+        setTimeout(() => {
+            show(tableContainer);
+        }, 350);
+
+        // T+450+: Table Rows (Sequential)
+        // Handled in renderTable() because rows are populated asynchronously
     }
 
     async scan() {
@@ -61,7 +109,6 @@ class PointBridgeUI {
                     const candidate = new ParserClass();
                     if (candidate.isApplicable(window.location.href)) {
                         parser = candidate;
-                        console.log(`PointBridge UI: Using ${p.className}`);
                         break;
                     }
                 } catch (e) {
@@ -86,7 +133,6 @@ class PointBridgeUI {
             const endTime = performance.now();   // End Timer
             const elapsed = (endTime - startTime).toFixed(0); // Milliseconds
 
-            console.log(`PointBridge Scan: Parser returned ${data.length} items in ${elapsed}ms.`);
             this.extractedData = data;
 
             if (data.length > 0) {
@@ -199,6 +245,17 @@ class PointBridgeUI {
             const response = await fetch(url);
             const html = await response.text();
             this.shadowRoot.innerHTML = html;
+
+            // Initial Hiding for Retro Effect
+            // Use visibility: hidden for instant "pop" effect (no fade)
+            const titleBar = this.shadowRoot.querySelector('.title-bar');
+            const body = this.shadowRoot.querySelector('.window-body');
+            const status = this.shadowRoot.querySelector('.status-bar');
+
+            if (titleBar) titleBar.style.visibility = 'hidden';
+            if (body) body.style.visibility = 'hidden';
+            if (status) status.style.visibility = 'hidden';
+
         } catch (e) {
             console.error("Failed to load UI template", e);
             this.shadowRoot.innerHTML = '<div style="background:white; p:10px; border:1px solid red">UI Load Error</div>';
@@ -259,7 +316,24 @@ class PointBridgeUI {
                     tr.classList.add('highlighted');
                 });
 
+                // Initial hidden state for retro reveal
+                tr.style.visibility = 'hidden';
+
                 tbody.appendChild(tr);
+            });
+
+            // Trigger Retro Reveal for Rows
+            const baseDelay = 500;
+
+            const rows = tbody.querySelectorAll('tr');
+            let currentDelay = baseDelay;
+            rows.forEach((row) => {
+                // Add fluctuation: 50ms to 150ms (Average 100ms)
+                const jitter = 0 + Math.random() * 100;
+                currentDelay += jitter;
+                setTimeout(() => {
+                    row.style.visibility = 'visible';
+                }, currentDelay);
             });
         }
     }
@@ -391,9 +465,63 @@ class PointBridgeUI {
             // Restore to the *logic* previous state (Normal or Maximized)
             // But if we are in Minimized, min/max buttons act as restore.
             if (state === 'MINIMIZED') {
-                applyState(previousState);
+                // Animate Restore
+                const startRect = win.getBoundingClientRect();
+
+                let endRect;
+                if (previousState === 'MAXIMIZED') {
+                    endRect = { left: 0, top: 0, width: window.innerWidth, height: window.innerHeight };
+                } else {
+                    // Normal Rect (Parsing '100px' to number)
+                    // If rect values are 'auto' (initial), fallback to defaults or current calculation?
+                    // updateNormalRect is called before minimize, so it should be pixel values.
+                    endRect = {
+                        left: parseFloat(normalRect.left) || (window.innerWidth - 620), // Fallback if null
+                        top: parseFloat(normalRect.top) || 20,
+                        width: parseFloat(normalRect.width) || 600,
+                        height: parseFloat(normalRect.height) || 400
+                    };
+                }
+
+                this.animateGhost(startRect, endRect, () => {
+                    applyState(previousState);
+                }, { zIndex: -1 }); // Render BEHIND the minimized window during restore
+
             } else if (state === 'MAXIMIZED') {
                 applyState('NORMAL');
+            }
+        };
+
+        const toggleMaximize = () => {
+            const startRect = win.getBoundingClientRect();
+
+            if (state === 'MAXIMIZED') {
+                // Restore Logic (Maximized -> Normal)
+                // Target is the stored normalRect
+                const endRect = {
+                    left: parseFloat(normalRect.left) || (window.innerWidth - 620),
+                    top: parseFloat(normalRect.top) || 20,
+                    width: parseFloat(normalRect.width) || 600,
+                    height: parseFloat(normalRect.height) || 400
+                };
+
+                this.animateGhost(startRect, endRect, () => {
+                    applyState('NORMAL');
+                });
+            } else if (state === 'NORMAL') {
+                // Maximize Logic (Normal -> Maximized)
+                updateNormalRect(); // Ensure we save current pos before maximizing
+
+                const endRect = {
+                    left: 0,
+                    top: 0,
+                    width: window.innerWidth,
+                    height: window.innerHeight
+                };
+
+                this.animateGhost(startRect, endRect, () => {
+                    applyState('MAXIMIZED');
+                });
             }
         };
 
@@ -403,10 +531,8 @@ class PointBridgeUI {
             titleBar.addEventListener('dblclick', () => {
                 if (state === 'MINIMIZED') {
                     restore();
-                } else if (state === 'MAXIMIZED') {
-                    applyState('NORMAL');
                 } else {
-                    applyState('MAXIMIZED');
+                    toggleMaximize();
                 }
             });
         }
@@ -417,7 +543,23 @@ class PointBridgeUI {
                 if (state === 'MINIMIZED') {
                     restore(); // Acts as Restore from Taskbar
                 } else {
-                    applyState('MINIMIZED');
+                    // Minimize Animation logic
+                    if (state === 'NORMAL') {
+                        updateNormalRect(); // Capture current state before minimizing
+                    }
+
+                    const startRect = win.getBoundingClientRect();
+                    const targetH = 30; // Approx title bar height
+                    const endRect = {
+                        left: 0,
+                        top: window.innerHeight - targetH,
+                        width: 200,
+                        height: targetH
+                    };
+
+                    this.animateGhost(startRect, endRect, () => {
+                        applyState('MINIMIZED');
+                    });
                 }
             });
         }
@@ -427,11 +569,9 @@ class PointBridgeUI {
                 e.stopPropagation();
                 if (state === 'MINIMIZED') {
                     // Restore to previous state (Normal or Maximized)
-                    applyState(previousState);
-                } else if (state === 'MAXIMIZED') {
-                    applyState('NORMAL');
+                    restore();
                 } else {
-                    applyState('MAXIMIZED');
+                    toggleMaximize();
                 }
             });
         }
@@ -470,49 +610,60 @@ class PointBridgeUI {
                 if (Math.abs(dx) < dragThreshold && Math.abs(dy) < dragThreshold) return;
                 isDragging = true;
 
-                // If starting drag from MAXIMIZED state:
+                // Handle Maximize -> Normal transition logic
                 if (state === 'MAXIMIZED') {
-                    // 1. Calculate relative mouse X position
                     const rect = win.getBoundingClientRect();
                     const ratioX = (dragStartX - rect.left) / rect.width;
 
-                    // 2. Restore to NORMAL (internally sets state and styles)
+                    // Restore technically to Normal state but keep visual as ghost
                     applyState('NORMAL');
 
-                    // 3. Adjust dragInitialLeft so the window "snaps" to mouse at same ratio
-                    // normalRect is now applied.
-                    const restoredW = parseFloat(normalRect.width) || 400; // Parse '400px'
-
-                    // New left such that (mouse - newLeft) / restoredW = ratioX
-                    // mouse - newLeft = restoredW * ratioX
-                    // newLeft = mouse - (restoredW * ratioX)
+                    const restoredW = parseFloat(normalRect.width) || 400;
                     dragInitialLeft = e.clientX - (restoredW * ratioX);
-                    dragInitialTop = e.clientY - 10; // Slightly offset
-
-                    // Update immediate position to avoid jump
-                    this.container.style.left = `${dragInitialLeft}px`;
-                    this.container.style.top = `${dragInitialTop}px`;
+                    dragInitialTop = e.clientY - 10;
                 }
+
+                // Create Ghost Frame at initial position
+                // Note: dragInitialLeft/Top might align with current window pos
+                const currentRect = win.getBoundingClientRect();
+                const initialRect = {
+                    left: dragInitialLeft,
+                    top: dragInitialTop,
+                    width: currentRect.width,
+                    height: currentRect.height
+                };
+                this.createGhost(initialRect);
             }
 
             let newTop = dragInitialTop + dy;
             let newLeft = dragInitialLeft + dx;
 
-            // Constraint: Top must not be negative
             if (newTop < 0) newTop = 0;
 
-            this.container.style.right = 'auto'; // Ensure absolute positioning
-            this.container.style.bottom = 'auto';
-            this.container.style.left = `${newLeft}px`;
-            this.container.style.top = `${newTop}px`;
-
-            // Note: Dragging in MINIMIZED state updates position but does not update `normalRect`.
-            // Restoring will return window to its standard position.
+            const ghost = this.shadowRoot.getElementById('ghost-frame');
+            if (ghost) {
+                ghost.style.left = `${newLeft}px`;
+                ghost.style.top = `${newTop}px`;
+            }
         };
 
         const onDragUp = () => {
-            if (isDragging && state === 'NORMAL') {
-                updateNormalRect(); // Checkpoint new position
+            if (isDragging) {
+                const ghost = this.shadowRoot.getElementById('ghost-frame');
+                if (ghost) {
+                    const rect = ghost.getBoundingClientRect();
+
+                    // Commit to actual window
+                    this.container.style.left = `${rect.left}px`;
+                    this.container.style.top = `${rect.top}px`;
+                    this.container.style.right = 'auto';
+
+                    ghost.remove();
+                }
+
+                if (state === 'NORMAL') {
+                    updateNormalRect();
+                }
             }
             isDragging = false;
             document.removeEventListener('mousemove', onDragMove);
@@ -557,6 +708,20 @@ class PointBridgeUI {
 
         const onResizeMove = (e) => {
             if (!isResizing) return;
+
+            // Create ghost on first move if not exists (though we normally do it on mousedown, 
+            // but doing it here ensures we have the rects right)
+            let ghost = this.shadowRoot.getElementById('ghost-frame');
+            if (!ghost) {
+                const currentRect = {
+                    left: resizeStartLeft,
+                    top: resizeStartTop,
+                    width: resizeStartW,
+                    height: resizeStartH
+                };
+                ghost = this.createGhost(currentRect);
+            }
+
             const dx = e.clientX - resizeStartX;
             const dy = e.clientY - resizeStartY;
 
@@ -573,17 +738,35 @@ class PointBridgeUI {
             if (newW < 200) newW = 200;
             if (newH < 100) newH = 100;
 
-            win.style.width = `${newW}px`;
-            win.style.height = `${newH}px`;
+            // Update Ghost Logic
+            ghost.style.width = `${newW}px`;
+            ghost.style.height = `${newH}px`;
 
             if (resizeDirection.includes('w') || resizeDirection.includes('n')) {
-                this.container.style.left = `${newLeft}px`;
-                this.container.style.top = `${newTop}px`;
+                ghost.style.left = `${newLeft}px`;
+                ghost.style.top = `${newTop}px`;
             }
         };
 
         const onResizeUp = () => {
-            if (isResizing) updateNormalRect();
+            if (isResizing) {
+                const ghost = this.shadowRoot.getElementById('ghost-frame');
+                if (ghost) {
+                    const rect = ghost.getBoundingClientRect();
+
+                    // Commit to actual window
+                    win.style.width = `${rect.width}px`;
+                    win.style.height = `${rect.height}px`;
+
+                    if (resizeDirection.includes('w') || resizeDirection.includes('n')) {
+                        this.container.style.left = `${rect.left}px`;
+                        this.container.style.top = `${rect.top}px`;
+                    }
+
+                    ghost.remove();
+                }
+                updateNormalRect();
+            }
             isResizing = false;
             document.removeEventListener('mousemove', onResizeMove);
             document.removeEventListener('mouseup', onResizeUp);
@@ -645,6 +828,94 @@ class PointBridgeUI {
         };
 
         window.addEventListener('resize', clampPosition);
+    }
+
+    animateGhost(startRect, endRect, callback, options = {}) {
+        const duration = 200; // ms
+        const startTime = performance.now();
+        const zIndex = options.zIndex !== undefined ? options.zIndex : 2147483647;
+        const ghost = this.createGhost(startRect, zIndex);
+
+        const animate = (currentTime) => {
+            const elapsed = currentTime - startTime;
+            const progress = Math.min(elapsed / duration, 1);
+
+            // Ease out cubic
+            const ease = 1 - Math.pow(1 - progress, 3);
+
+            const current = {
+                left: startRect.left + (endRect.left - startRect.left) * ease,
+                top: startRect.top + (endRect.top - startRect.top) * ease,
+                width: startRect.width + (endRect.width - startRect.width) * ease,
+                height: startRect.height + (endRect.height - startRect.height) * ease
+            };
+
+            ghost.style.left = `${current.left}px`;
+            ghost.style.top = `${current.top}px`;
+            ghost.style.width = `${current.width}px`;
+            ghost.style.height = `${current.height}px`;
+
+            // Adjust inner divs if necessary (they use absolute positioning so should scale automatically)
+
+            if (progress < 1) {
+                requestAnimationFrame(animate);
+            } else {
+                ghost.remove();
+                if (callback) callback();
+            }
+        };
+
+        requestAnimationFrame(animate);
+    }
+
+    createGhost(rect, zIndex = 2147483647) {
+        // Remove existing ghost if any
+        let ghost = this.shadowRoot.getElementById('ghost-frame');
+        if (ghost) ghost.remove();
+
+        ghost = document.createElement('div');
+
+        ghost.id = 'ghost-frame';
+        ghost.style.position = 'fixed';
+        ghost.style.zIndex = zIndex;
+        ghost.style.pointerEvents = 'none';
+
+        // Initial Geometry from argument
+        ghost.style.left = `${rect.left}px`;
+        ghost.style.top = `${rect.top}px`;
+        ghost.style.width = `${rect.width}px`;
+        ghost.style.height = `${rect.height}px`;
+
+        // Create 4 divs for borders to ensure robust rendering (avoid border-image quirks)
+        // 4x4 Checkerboard SVG Data URI (Retina Friendly - 2px dots)
+        const pattern = `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='4' height='4'%3E%3Crect width='4' height='4' fill='white'/%3E%3Crect width='2' height='2' fill='black'/%3E%3Crect x='2' y='2' width='2' height='2' fill='black'/%3E%3C/svg%3E`;
+        const borderStyle = `
+            position: absolute;
+            background-image: url("${pattern}");
+            background-repeat: repeat;
+            z-index: 2147483647;
+        `;
+        const thickness = '4px'; // Increased thickness for visibility on high-DPI screens
+
+        const top = document.createElement('div');
+        top.style.cssText = `${borderStyle} top: 0; left: 0; right: 0; height: ${thickness};`;
+
+        const bottom = document.createElement('div');
+        bottom.style.cssText = `${borderStyle} bottom: 0; left: 0; right: 0; height: ${thickness};`;
+
+        const left = document.createElement('div');
+        left.style.cssText = `${borderStyle} top: 0; bottom: 0; left: 0; width: ${thickness};`;
+
+        const right = document.createElement('div');
+        right.style.cssText = `${borderStyle} top: 0; bottom: 0; right: 0; width: ${thickness};`;
+
+        ghost.appendChild(top);
+        ghost.appendChild(bottom);
+        ghost.appendChild(left);
+        ghost.appendChild(right);
+
+        this.shadowRoot.appendChild(ghost);
+        return ghost;
     }
 }
 

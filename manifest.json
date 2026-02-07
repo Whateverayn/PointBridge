@@ -20,18 +20,6 @@
         "page": "options/index.html",
         "open_in_tab": false
     },
-    "content_scripts": [
-        {
-            "matches": [
-                "*://icoca.jr-odekake.net/pc/pointref_search.do*",
-                "*://point.rakuten.co.jp/history/*"
-            ],
-            "js": [
-                "content_scripts/loader.js",
-                "content_scripts/ui.js"
-            ]
-        }
-    ],
     "background": {
         "scripts": [
             "background/main.js"
