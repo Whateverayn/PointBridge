@@ -36,11 +36,20 @@
     }
 
     .title-bar-text {
+        margin-right: 16px;
+        /* Space for controls */
+        flex: 1;
+        display: flex;
+        align-items: center;
+        min-width: 0;
+        /* Allow flex item to shrink below content */
+    }
+
+    .title-text {
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
-        margin-right: 16px;
-        /* Space for controls */
+        flex: 1;
     }
 
     /* Maximize fix */
@@ -52,7 +61,11 @@
 
 <div class="window">
     <div class="title-bar">
-        <div class="title-bar-text">PointBridge</div>
+        <div class="title-bar-text" style="display: flex; align-items: center;">
+            <img id="app-icon"
+                style="height: 16px; width: 16px; margin-right: 6px; pointer-events: auto; cursor: pointer;" />
+            <span class="title-text">PointBridge</span>
+        </div>
         <div class="title-bar-controls">
             <button aria-label="Minimize"></button>
             <button aria-label="Maximize"></button>

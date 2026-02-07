@@ -125,7 +125,8 @@ class PointBridgeUI {
             if (titleEl) {
                 // Determine site name (could be more robust, but simple check for now)
                 const siteName = document.title || "Unknown Site";
-                titleEl.textContent = `PointBridge - ${siteName}`;
+                const titleText = this.shadowRoot.querySelector('.title-text');
+                if (titleText) titleText.textContent = `PointBridge - ${siteName}`;
             }
 
             const startTime = performance.now(); // Start Timer
@@ -246,6 +247,12 @@ class PointBridgeUI {
             const html = await response.text();
             this.shadowRoot.innerHTML = html;
 
+            // Set Icon
+            const icon = this.shadowRoot.getElementById('app-icon');
+            if (icon) {
+                icon.src = chrome.runtime.getURL('icons/icon-svg.svg');
+            }
+
             // Initial Hiding for Retro Effect
             // Use visibility: hidden for instant "pop" effect (no fade)
             const titleBar = this.shadowRoot.querySelector('.title-bar');
@@ -352,6 +359,14 @@ class PointBridgeUI {
 
         // CSS Improvements for behaviors
         if (titleBar) titleBar.style.userSelect = 'none';
+
+        const appIcon = this.shadowRoot.getElementById('app-icon');
+        if (appIcon) {
+            appIcon.addEventListener('dblclick', (e) => {
+                e.stopPropagation(); // Prevent anything else
+                this.toggle();
+            });
+        }
 
         if (closeBtn) closeBtn.addEventListener('click', () => this.toggle());
         if (scanBtn) scanBtn.addEventListener('click', () => this.scan());
