@@ -16,22 +16,25 @@
         }
     ];
 
+    // Static loading to avoid "Unsafe call to import" warning
     let parserInstance = null;
+    const currentUrl = window.location.href;
 
-    for (const p of parsers) {
-        try {
-            const module = await import(p.url);
-            const ParserClass = module[p.className];
-            const parser = new ParserClass();
-
-            if (parser.isApplicable(window.location.href)) {
-                parserInstance = parser;
-                // console.log(`PointBridge Loader: ${p.className} initialized.`);
-                break; // Stop after finding the first applicable parser
-            }
-        } catch (e) {
-            // console.debug(`PointBridge Loader: Skipped ${p.name} parser (not applicable or failed load).`, e);
+    try {
+        // Wester
+        if (currentUrl.includes('icoca.jr-odekake.net')) {
+            const module = await import(chrome.runtime.getURL('parsers/wester/parser.js'));
+            const p = new module.WesterParser();
+            if (p.isApplicable(currentUrl)) parserInstance = p;
         }
+        // Rakuten
+        else if (currentUrl.includes('point.rakuten.co.jp')) {
+            const module = await import(chrome.runtime.getURL('parsers/rakuten/parser.js'));
+            const p = new module.RakutenParser();
+            if (p.isApplicable(currentUrl)) parserInstance = p;
+        }
+    } catch (e) {
+        // console.error(e);
     }
 
     if (!parserInstance) {

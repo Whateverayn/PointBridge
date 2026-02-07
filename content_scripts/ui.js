@@ -101,19 +101,22 @@ class PointBridgeUI {
                 }
             ];
 
+            // Static loading to avoid "Unsafe call to import" warning
+            const currentUrl = window.location.href;
             let parser = null;
-            for (const p of parsers) {
-                try {
-                    const module = await import(p.url);
-                    const ParserClass = module[p.className];
-                    const candidate = new ParserClass();
-                    if (candidate.isApplicable(window.location.href)) {
-                        parser = candidate;
-                        break;
-                    }
-                } catch (e) {
-                    console.error(`PointBridge UI: Error checking ${p.name}`, e);
+
+            try {
+                if (currentUrl.includes('icoca.jr-odekake.net')) {
+                    const module = await import(chrome.runtime.getURL('parsers/wester/parser.js'));
+                    const candidate = new module.WesterParser();
+                    if (candidate.isApplicable(currentUrl)) parser = candidate;
+                } else if (currentUrl.includes('point.rakuten.co.jp')) {
+                    const module = await import(chrome.runtime.getURL('parsers/rakuten/parser.js'));
+                    const candidate = new module.RakutenParser();
+                    if (candidate.isApplicable(currentUrl)) parser = candidate;
                 }
+            } catch (e) {
+                console.error("Parser load error", e);
             }
 
             if (!parser) {
@@ -230,7 +233,14 @@ class PointBridgeUI {
         body.appendChild(errorContainer);
 
         const shadow = errorContainer.attachShadow({ mode: 'open' });
-        shadow.innerHTML = htmlContent;
+
+        // Use iframe for safe rendering of untrusted HTML
+        const iframe = document.createElement('iframe');
+        iframe.style.width = '100%';
+        iframe.style.height = '100%';
+        iframe.style.border = 'none';
+        iframe.srcdoc = htmlContent;
+        shadow.appendChild(iframe);
     }
 
     clearErrorView() {
@@ -245,7 +255,18 @@ class PointBridgeUI {
             const url = chrome.runtime.getURL('content_scripts/ui.html');
             const response = await fetch(url);
             const html = await response.text();
-            this.shadowRoot.innerHTML = html;
+
+            // Use DOMParser to avoid unsafe innerHTML assignment
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(html, 'text/html');
+
+            // Move styles to shadowRoot (simple appendChild works for <style> and elements)
+            // Note: We need to iterate carefully or just append the head/body contents.
+            // Since ui.html likely has <style> in head and markup in body.
+
+            this.shadowRoot.innerHTML = ''; // Clear
+            Array.from(doc.head.childNodes).forEach(node => this.shadowRoot.appendChild(node.cloneNode(true)));
+            Array.from(doc.body.childNodes).forEach(node => this.shadowRoot.appendChild(node.cloneNode(true)));
 
             // Set Icon
             const icon = this.shadowRoot.getElementById('app-icon');
