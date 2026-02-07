@@ -89,7 +89,7 @@ class PointBridgeUI {
         // Handled in renderTable() because rows are populated asynchronously
     }
 
-    async scan() {
+    async scan(currentRetryCount = 0) {
         const statusEl = this.shadowRoot.getElementById('status-text');
         statusEl.textContent = "スキャニング・ナウ...";
 
@@ -156,7 +156,7 @@ class PointBridgeUI {
 
             // Auto-Send Trigger with Dynamic Delay
             if (this.autoSend && data.length > 0) {
-                this.triggerAutoSendLoop();
+                this.triggerAutoSendLoop(currentRetryCount);
             }
         } catch (e) {
             console.error(e);
@@ -179,10 +179,14 @@ class PointBridgeUI {
 
         try {
             // Send data via background script to avoid CORS issues in content script
+            // Remove UI-specific flags (isCancellation) before sending to GAS
+            // Use destruction to create a copy without the flag
+            const dataToSend = this.extractedData.map(({ isCancellation, ...item }) => item);
+
             const response = await chrome.runtime.sendMessage({
                 action: "send-data",
                 url: gasUrl,
-                data: this.extractedData
+                data: dataToSend
             });
 
             const endTime = performance.now();
@@ -254,19 +258,8 @@ class PointBridgeUI {
                 statusEl.textContent = `アディショナル・データ (${addedCount}) ディテクテッド. リ・スキャン...`;
                 await new Promise(r => setTimeout(r, 1500)); // Wait before retry
 
-                // Scan again
-                await this.scan();
-                // Note: scan() calls triggerAutoSendLoop() at the end, 
-                // but we need to pass the retry state to avoid infinite recursion without limits.
-                // Refactor idea: scan() doesn't need to know about retry count if we track it here?
-                // Actually, if scan() calls triggerAutoSendLoop() blindly, it resets count to 0 (default).
-                // Issue: Infinite loop risk.
-                // WE MUST PREVENT scan() from calling triggerAutoSendLoop() IF called from here.
-                // Solution: Pass a flag to scan() or manage state.
-
-                // Better: Just loop HERE.
-                // But scan() is async and updates `this.extractedData`.
-                // If we call scan(), it will trigger logic.
+                // Scan again with incremented retry count
+                await this.scan(retryCount + 1);
             } else {
                 // Added 0 -> Done.
                 console.log("Auto-Send: No new records added. Loop finished.");
@@ -407,6 +400,11 @@ class PointBridgeUI {
 
                 // Initial hidden state for retro reveal
                 tr.style.visibility = 'hidden';
+
+                // Cancellation styling
+                if (item.isCancellation) {
+                    tr.style.fontWeight = 'bold';
+                }
 
                 tbody.appendChild(tr);
             });

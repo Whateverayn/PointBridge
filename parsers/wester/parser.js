@@ -40,15 +40,19 @@ export class WesterParser extends Parser {
             // Parse amount: "180 P" -> 180, "-1,200 P" -> -1200
             const amount = parseInt(amountStr.replace(/,/g, '').replace(' P', ''), 10);
 
-            // Rule: Only collect gained points (positive amount).
-            if (amount > 0) {
+            // Rule: Collect all transactions needed (both gain and loss/cancellation)
+            // Identify if it's a cancellation based on keywords
+            const isCancellation = amount < 0 && (description.includes('【取消】') || description.includes('取消'));
+
+            // Filter: Include if Positive OR Cancelled. Exclude mere usage (negative w/o cancel flag)
+            if (amount > 0 || isCancellation) {
                 transactions.push({
                     site: this.siteId,
                     date: dateStr,
                     service: place,
                     description: description,
                     amount: amount,
-                    // note: cells[4].textContent.trim()
+                    isCancellation: isCancellation
                 });
             }
         });
