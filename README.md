@@ -37,7 +37,8 @@ Releases ページから最新の `xpi` ファイルをダウンロードしま�
 
 現時点では, 以下のサイトに対応しています.
 
-- [WESTERポイント照会](https://icoca.jr-odekake.net/pc/pointref.do)
+- [WESTERポイント照会](https://wester.jr-odekake.net/)
+- [楽天PointClub](https://point.rakuten.co.jp/)
 
 ## 免責事項
 

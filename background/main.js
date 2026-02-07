@@ -10,8 +10,8 @@ chrome.runtime.onInstalled.addListener(() => {
         title: "ラウンチ PointBridge",
         contexts: ["page", "selection"],
         documentUrlPatterns: [
-            "*://clubj.jr-odekake.net/*",
-            "*://icoca.jr-odekake.net/*"
+            "*://icoca.jr-odekake.net/pc/pointref_search.do*",
+            "*://point.rakuten.co.jp/history/*"
         ]
     });
 });

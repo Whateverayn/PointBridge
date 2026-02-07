@@ -39,10 +39,39 @@ class PointBridgeUI {
         statusEl.textContent = "スキャニング・ナウ...";
 
         try {
-            const parserUrl = chrome.runtime.getURL('parsers/wester/parser.js');
-            const module = await import(parserUrl);
-            const { WesterParser } = module;
-            const parser = new WesterParser();
+            // Dynamic Parser Loading
+            const parsers = [
+                {
+                    name: 'Wester',
+                    url: chrome.runtime.getURL('parsers/wester/parser.js'),
+                    className: 'WesterParser'
+                },
+                {
+                    name: 'Rakuten',
+                    url: chrome.runtime.getURL('parsers/rakuten/parser.js'),
+                    className: 'RakutenParser'
+                }
+            ];
+
+            let parser = null;
+            for (const p of parsers) {
+                try {
+                    const module = await import(p.url);
+                    const ParserClass = module[p.className];
+                    const candidate = new ParserClass();
+                    if (candidate.isApplicable(window.location.href)) {
+                        parser = candidate;
+                        console.log(`PointBridge UI: Using ${p.className}`);
+                        break;
+                    }
+                } catch (e) {
+                    console.error(`PointBridge UI: Error checking ${p.name}`, e);
+                }
+            }
+
+            if (!parser) {
+                throw new Error("No applicable parser found for this site.");
+            }
 
             // Update title bar with site info if available
             const titleEl = this.shadowRoot.querySelector('.title-bar-text');
@@ -52,15 +81,20 @@ class PointBridgeUI {
                 titleEl.textContent = `PointBridge - ${siteName}`;
             }
 
+            const startTime = performance.now(); // Start Timer
             const data = parser.parse(document);
+            const endTime = performance.now();   // End Timer
+            const elapsed = (endTime - startTime).toFixed(0); // Milliseconds
+
+            console.log(`PointBridge Scan: Parser returned ${data.length} items in ${elapsed}ms.`);
             this.extractedData = data;
 
             if (data.length > 0) {
-                statusEl.textContent = `${data.length} 件のレコード.`;
-                this.renderTable(data);
+                statusEl.textContent = `${data.length} 件のレコード (${elapsed}ms)`;
+                this.renderTable(data, parser);
             } else {
                 statusEl.textContent = "リソースがエンプティです.";
-                this.renderTable([]);
+                this.renderTable([], parser);
             }
         } catch (e) {
             console.error(e);
@@ -79,6 +113,7 @@ class PointBridgeUI {
         }
 
         statusEl.textContent = "プッシュ中...";
+        const startTime = performance.now();
 
         try {
             // Send data via background script to avoid CORS issues in content script
@@ -88,20 +123,37 @@ class PointBridgeUI {
                 data: this.extractedData
             });
 
+            const endTime = performance.now();
+            const elapsed = ((endTime - startTime) / 1000).toFixed(2); // Seconds
+
             if (response && response.success && response.data && response.data.status === 'success') {
                 const addedCount = response.data.addedCount !== undefined ? response.data.addedCount : '?';
-                statusEl.textContent = `プッシュ・コンプリート (アディッド: ${addedCount})`;
+                statusEl.textContent = `プッシュ・コンプリート (アディッド: ${addedCount}) イン ${elapsed}s`;
                 console.log("Response:", response.data);
+
+                // Visualize Duplicates using CSS class
+                if (response.data.results && Array.isArray(response.data.results)) {
+                    const tbody = this.shadowRoot.querySelector('#data-table tbody');
+                    const rows = tbody ? tbody.querySelectorAll('tr') : [];
+
+                    response.data.results.forEach((res, index) => {
+                        if (res.status === 'skipped' && rows[index]) {
+                            rows[index].classList.add('duplicate');
+                            rows[index].title = "オールレディ・レジスタードです (デュプリケーション)";
+                        }
+                    });
+                }
+
                 this.clearErrorView(); // Clear any previous errors
             } else {
                 const errorMsg = response.data?.message || response.error || 'Unknown error';
                 console.error("Push failed:", response);
+                statusEl.textContent = `エラー: ${errorMsg} (${elapsed}s)`;
 
                 if (errorMsg.includes('<!DOCTYPE html>') || errorMsg.includes('<html')) {
                     statusEl.textContent = "クリティカル・エラー: 詳細を表示します";
                     this.renderErrorHtml(errorMsg);
                 } else {
-                    statusEl.textContent = `エラー: ${errorMsg}`;
                     this.clearErrorView();
                 }
             }
@@ -153,20 +205,63 @@ class PointBridgeUI {
         }
     }
 
-    renderTable(data) {
-        const tbody = this.shadowRoot.querySelector('#data-table tbody');
-        if (!tbody) return;
-        tbody.innerHTML = '';
-        data.forEach(item => {
+    renderTable(data, parser) {
+        const table = this.shadowRoot.querySelector('#data-table');
+        if (!table) return;
+
+        // Get columns from parser or use default
+        const columns = (parser && typeof parser.getColumns === 'function')
+            ? parser.getColumns()
+            : [
+                { header: "デイト", key: "date" },
+                { header: "サービス", key: "service" },
+                { header: "ディテール", key: "description" },
+                { header: "ゲイン", key: "amount", style: "text-align: right;" }
+            ];
+
+        // Render Header
+        const thead = table.querySelector('thead');
+        if (thead) {
+            thead.innerHTML = '';
             const tr = document.createElement('tr');
-            tr.innerHTML = `
-                <td>${item.date}</td>
-                <td>${item.service}</td>
-                <td>${item.description}</td>
-                <td style="text-align: right;">${item.amount}</td>
-            `;
-            tbody.appendChild(tr);
-        });
+            columns.forEach(col => {
+                const th = document.createElement('th');
+                th.textContent = col.header;
+                if (col.style) th.style.cssText = col.style;
+                tr.appendChild(th);
+            });
+            thead.appendChild(tr);
+        }
+
+        // Render Body
+        const tbody = table.querySelector('tbody');
+        if (tbody) {
+            tbody.innerHTML = '';
+            data.forEach(item => {
+                const tr = document.createElement('tr');
+                columns.forEach(col => {
+                    const td = document.createElement('td');
+                    let val = item[col.key];
+
+                    // Formatter logic (e.g. for numbers with commas)
+                    if (col.formatter) {
+                        val = col.formatter(val);
+                    }
+
+                    td.textContent = (val !== undefined && val !== null) ? val : "";
+                    if (col.style) td.style.cssText = col.style;
+                    tr.appendChild(td);
+                });
+                // Add 98.css row highlighting behavior
+                tr.addEventListener('click', () => {
+                    const rows = tbody.querySelectorAll('tr');
+                    rows.forEach(r => r.classList.remove('highlighted'));
+                    tr.classList.add('highlighted');
+                });
+
+                tbody.appendChild(tr);
+            });
+        }
     }
 
     attachListeners() {
@@ -198,7 +293,7 @@ class PointBridgeUI {
         // Rect for NORMAL state (pixel values)
         // We initialize with defaults, but update on interaction
         let normalRect = {
-            left: null, top: null, width: '400px', height: 'auto'
+            left: null, top: null, width: '600px', height: 'auto'
         };
 
         // Helper to capture current Geometry as Normal Rect
@@ -331,16 +426,7 @@ class PointBridgeUI {
             maxBtn.addEventListener('click', (e) => {
                 e.stopPropagation();
                 if (state === 'MINIMIZED') {
-                    // Minimized Logic:
-                    // If previous was MAX, icon is Restore. Clicking means Restore Down (Normal) or Restore Up (Max)?
-                    // User requested typical behavior.
-                    // If I am Minimized(Normal) -> Click Max -> Go Maximize.
-                    // If I am Minimized(Max) -> Click Restore -> Go Normal? 
-                    // Actually, if it's minimized, "Restore" usually means "Restore to previous state".
-                    // But we have the min button for that.
-                    // Let's assume Max button always drives towards Maximize, 
-                    // unless we are "Restoring Down" from Max.
-
+                    // Restore to previous state (Normal or Maximized)
                     applyState(previousState);
                 } else if (state === 'MAXIMIZED') {
                     applyState('NORMAL');
@@ -420,14 +506,8 @@ class PointBridgeUI {
             this.container.style.left = `${newLeft}px`;
             this.container.style.top = `${newTop}px`;
 
-            // Note: If dragging in MINIMIZED, we just move `this.container`. 
-            // We do NOT update `normalRect` or `state` logic, keeping it simple.
-            // When restoring from MINIMIZED, it currently snaps back to `previousState` pos.
-            // User requested: "drag minimized... restore...". 
-            // Our logic: restore() uses `applyState(previousState)` which restores `normalRect`.
-            // This means dragging the minimized window DOES NOT move the restored window location.
-            // This is "Token" behavior. User might accept this.
-            // If user wants Position Continuity, we would need to update normalRect logic here.
+            // Note: Dragging in MINIMIZED state updates position but does not update `normalRect`.
+            // Restoring will return window to its standard position.
         };
 
         const onDragUp = () => {
@@ -508,6 +588,63 @@ class PointBridgeUI {
             document.removeEventListener('mousemove', onResizeMove);
             document.removeEventListener('mouseup', onResizeUp);
         };
+
+        // --- Viewport Clamping (Bugfix) ---
+        const clampPosition = () => {
+            // Only relevant if visible and in NORMAL state (usually)
+            // But let's apply for any state where we use absolute positioning.
+            // MAXIMIZED/MINIMIZED usually stick to edges by definition, but NORMAL is free-floating.
+            if (!this.isVisible || state !== 'NORMAL') return;
+
+            const rect = this.container.getBoundingClientRect();
+            const viewportW = window.innerWidth;
+            const viewportH = window.innerHeight;
+
+            // Calculate visible intersection (表示されている領域の計算)
+            const visibleLeft = Math.max(rect.left, 0);
+            const visibleRight = Math.min(rect.left + rect.width, viewportW);
+            const visibleWidth = Math.max(0, visibleRight - visibleLeft);
+
+            const visibleTop = Math.max(rect.top, 0);
+            const visibleBottom = Math.min(rect.top + rect.height, viewportH);
+            const visibleHeight = Math.max(0, visibleBottom - visibleTop);
+
+            // User Request: If at least 32x32 is visible, don't move it.
+            // This allows "parking" the window at the edge.
+            // 32px x 32px 以上見えていれば何もしない
+            if (visibleWidth >= 32 && visibleHeight >= 32) {
+                return;
+            }
+
+            // If we are here, the window is mostly lost. Bring it back fully on screen.
+            // それ未満しか見えていない場合（ほぼ隠れた場合）は強制的に引き戻す
+            let newLeft = rect.left;
+            let newTop = rect.top;
+
+            // 1. Right Edge Check
+            if (newLeft + rect.width > viewportW) {
+                newLeft = viewportW - rect.width;
+            }
+            // 2. Bottom Edge Check
+            if (newTop + rect.height > viewportH) {
+                newTop = viewportH - rect.height;
+            }
+            // 3. Left Edge Check (Priority over Right)
+            if (newLeft < 0) newLeft = 0;
+            // 4. Top Edge Check (Priority over Bottom)
+            if (newTop < 0) newTop = 0;
+
+            if (newLeft !== rect.left || newTop !== rect.top) {
+                this.container.style.left = `${newLeft}px`;
+                this.container.style.top = `${newTop}px`;
+                this.container.style.right = 'auto'; // Ensure we are using left/top
+
+                // Update normalRect so we remember this safe position
+                updateNormalRect();
+            }
+        };
+
+        window.addEventListener('resize', clampPosition);
     }
 }
 

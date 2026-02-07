@@ -1,9 +1,10 @@
 <link rel="stylesheet" href="https://unpkg.com/98.css">
 <style>
     .window {
-        width: 400px;
+        width: auto;
         /* Initial width */
         min-width: 250px;
+        max-width: calc(100vw - 40px);
         display: flex;
         flex-direction: column;
         box-sizing: border-box;
@@ -22,6 +23,11 @@
         flex: 1;
         overflow: auto;
         background: white;
+    }
+
+    .duplicate {
+        color: #808080;
+        /* Disabled/Grayed out text */
     }
 
     table {

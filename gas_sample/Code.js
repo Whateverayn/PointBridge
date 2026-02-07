@@ -25,93 +25,111 @@ function doPost(e) {
         const ss = SpreadsheetApp.getActiveSpreadsheet();
         let totalAdded = 0;
 
-        // 2. サイトごとにグルーピング
-        const groupedData = {};
-        data.forEach(item => {
-            const site = item.site || 'unknown';
-            if (!groupedData[site]) groupedData[site] = [];
-            groupedData[site].push(item);
-        });
+        // 2. サイトごとの既存データ（シグネチャ）を読み込む
+        // データに含まれるサイトIDを特定
+        const sites = [...new Set(data.map(d => d.site || 'unknown'))];
 
-        // 3. サイトごとに処理
-        for (const siteId in groupedData) {
-            const items = groupedData[siteId];
-            if (items.length === 0) continue;
+        const siteSignatures = {}; // site -> Set(signature)
+        const siteHeaders = {};    // site -> Array(header)
+        const siteSheets = {};     // site -> Sheet Object
 
-            // データのキーを取得 (site以外)
-            const sampleItem = items[0];
-            const dataKeys = Object.keys(sampleItem).filter(k => k !== 'site');
-
+        // 事前準備: 各サイトのシートと既存データをロード
+        sites.forEach(siteId => {
             let sheet = ss.getSheetByName(siteId);
             let headers = [];
 
-            // シート作成またはヘッダ取得
+            // このサイトIDに該当するデータのサンプルを探してキーを取得
+            const sampleForSite = data.find(d => (d.site || 'unknown') === siteId);
+            const dataKeys = Object.keys(sampleForSite).filter(k => k !== 'site');
+
             if (!sheet) {
+                // シートがない場合は作成 (書き込みは後で)
                 sheet = ss.insertSheet(siteId);
-                // ヘッダ作成: データのキー + 管理用カラム
                 headers = [...dataKeys, "ImportedAt"];
                 sheet.appendRow(headers);
                 sheet.setFrozenRows(1);
                 sheet.getRange(1, 1, 1, headers.length).setFontWeight("bold");
             } else {
-                // 既存シートのヘッダ読み込み
                 const lastCol = sheet.getLastColumn();
                 if (lastCol > 0) {
                     headers = sheet.getRange(1, 1, 1, lastCol).getValues()[0];
                 } else {
-                    // シートはあるがヘッダがない場合
                     headers = [...dataKeys, "ImportedAt"];
                     sheet.appendRow(headers);
                 }
             }
 
-            // 重複チェックの準備
-            // 既存データの全行を取得
-            const existingData = sheet.getDataRange().getValues(); // 1行目(ヘッダ)含む
-            const existingSignatures = new Set();
+            siteSheets[siteId] = sheet;
+            siteHeaders[siteId] = headers;
 
-            // ヘッダ名 -> 列インデックス のマップ
-            const headerMap = {};
-            headers.forEach((h, i) => { headerMap[h] = i; });
+            // 既存シグネチャ読み込み
+            // データ行がある場合のみ取得 (1行目はヘッダ)
+            const lastRow = sheet.getLastRow();
+            const sigs = new Set();
 
-            // 重複判定に使うキー（データのキーすべて）に基づき, 既存データのシグネチャを作成
-            for (let i = 1; i < existingData.length; i++) {
-                const row = existingData[i];
-                const signature = createSignature(row, headerMap, dataKeys);
-                existingSignatures.add(signature);
-            }
+            if (lastRow > 1) {
+                const existingData = sheet.getRange(1, 1, lastRow, sheet.getLastColumn()).getValues();
+                const headerMap = {};
+                headers.forEach((h, i) => { headerMap[h] = i; });
 
-            // 新規行の作成
-            const newRows = [];
-            items.forEach(item => {
-                // アイテムからシグネチャ生成 (比較用)
-                const itemSignature = createItemSignature(item, dataKeys);
-
-                if (!existingSignatures.has(itemSignature)) {
-                    // シートのヘッダ順に合わせて行データを作成
-                    const rowData = headers.map(header => {
-                        if (header === 'ImportedAt') return new Date();
-                        return item[header] !== undefined ? item[header] : "";
-                        // シートにあってデータにないカラムは空文字
-                    });
-                    newRows.push(rowData);
-
-                    // 同一リクエスト内の重複も排除
-                    existingSignatures.add(itemSignature);
+                for (let i = 1; i < existingData.length; i++) {
+                    const row = existingData[i];
+                    const signature = createSignature(row, headerMap, dataKeys);
+                    sigs.add(signature);
                 }
-            });
+            }
+            siteSignatures[siteId] = sigs;
+        });
 
-            // 書き込み
+        const results = []; // 各行のステータス: { status: 'added' | 'skipped' }
+        const rowsToAdd = {}; // site -> Array(row)
+
+        // 3. 全データを元の順序でチェック
+        data.forEach(item => {
+            const siteId = item.site || 'unknown';
+            const sigs = siteSignatures[siteId];
+            const headers = siteHeaders[siteId];
+
+            // シグネチャ生成用キー（このアイテムの情報）
+            const keys = Object.keys(item).filter(k => k !== 'site');
+            const itemSignature = createItemSignature(item, keys);
+
+            if (!sigs.has(itemSignature)) {
+                // 新規データ
+                results.push({ status: 'added' });
+
+                // 同一リクエスト内での重複防止のためセットに追加
+                sigs.add(itemSignature);
+
+                // 行データ作成
+                const rowData = headers.map(header => {
+                    if (header === 'ImportedAt') return new Date();
+                    return item[header] !== undefined ? item[header] : "";
+                });
+
+                if (!rowsToAdd[siteId]) rowsToAdd[siteId] = [];
+                rowsToAdd[siteId].push(rowData);
+                totalAdded++;
+            } else {
+                // 重複データ
+                results.push({ status: 'skipped' });
+            }
+        });
+
+        // 4. 書き込み (サイトごとにまとめて)
+        for (const siteId in rowsToAdd) {
+            const newRows = rowsToAdd[siteId];
             if (newRows.length > 0) {
+                const sheet = siteSheets[siteId];
                 sheet.getRange(sheet.getLastRow() + 1, 1, newRows.length, newRows[0].length).setValues(newRows);
-                totalAdded += newRows.length;
             }
         }
 
         return ContentService.createTextOutput(JSON.stringify({
             status: "success",
             message: `${totalAdded} items added.`,
-            addedCount: totalAdded
+            addedCount: totalAdded,
+            results: results
         })).setMimeType(ContentService.MimeType.JSON);
 
     } catch (error) {

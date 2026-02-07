@@ -23,7 +23,8 @@
     "content_scripts": [
         {
             "matches": [
-                "*://icoca.jr-odekake.net/pc/pointref_search.do*"
+                "*://icoca.jr-odekake.net/pc/pointref_search.do*",
+                "*://point.rakuten.co.jp/history/*"
             ],
             "js": [
                 "content_scripts/loader.js",
@@ -41,10 +42,12 @@
             "resources": [
                 "parsers/interface.js",
                 "parsers/wester/parser.js",
+                "parsers/rakuten/parser.js",
                 "content_scripts/ui.html"
             ],
             "matches": [
-                "*://icoca.jr-odekake.net/*"
+                "*://icoca.jr-odekake.net/*",
+                "*://point.rakuten.co.jp/*"
             ]
         }
     ]

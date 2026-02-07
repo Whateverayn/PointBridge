@@ -10,6 +10,15 @@ export class WesterParser extends Parser {
         return url.includes('pointref_search.do');
     }
 
+    getColumns() {
+        return [
+            { header: "デイト", key: "date" },
+            { header: "サービス", key: "service" },
+            { header: "ディテール", key: "description" },
+            { header: "ゲイン", key: "amount", style: "text-align: right;" }
+        ];
+    }
+
     parse(document) {
         const transactions = [];
         const tables = document.querySelectorAll('.detailTableWrap table');
