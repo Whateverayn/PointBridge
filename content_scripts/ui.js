@@ -102,6 +102,11 @@ class PointBridgeUI {
                     className: 'WesterParser'
                 },
                 {
+                    name: 'Ponta',
+                    url: chrome.runtime.getURL('parsers/ponta/parser.js'),
+                    className: 'PontaParser'
+                },
+                {
                     name: 'Rakuten',
                     url: chrome.runtime.getURL('parsers/rakuten/parser.js'),
                     className: 'RakutenParser'
@@ -112,6 +117,12 @@ class PointBridgeUI {
             const currentUrl = window.location.href;
             let parser = null;
 
+            // Fetch generic options (currently just Ponta management preference)
+            const { includePontaManagement } = await chrome.storage.local.get(['includePontaManagement']);
+            const parserOptions = {
+                includePontaManagement: !!includePontaManagement
+            };
+
             try {
                 if (currentUrl.includes('icoca.jr-odekake.net')) {
                     const module = await import(chrome.runtime.getURL('parsers/wester/parser.js'));
@@ -120,6 +131,10 @@ class PointBridgeUI {
                 } else if (currentUrl.includes('point.rakuten.co.jp')) {
                     const module = await import(chrome.runtime.getURL('parsers/rakuten/parser.js'));
                     const candidate = new module.RakutenParser();
+                    if (candidate.isApplicable(currentUrl)) parser = candidate;
+                } else if (currentUrl.includes('point-portal.auone.jp/point/history')) {
+                    const module = await import(chrome.runtime.getURL('parsers/ponta/parser.js'));
+                    const candidate = new module.PontaParser(parserOptions);
                     if (candidate.isApplicable(currentUrl)) parser = candidate;
                 }
             } catch (e) {

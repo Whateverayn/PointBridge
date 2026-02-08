@@ -1,6 +1,6 @@
 # PointBridge
 
-各社のポイント履歴ページからデータを抽出し, Google Apps Script 経由でスプレッドシートに集約するFirefoxアドオンです.
+[各社](#対応サイト) のポイント履歴ページからデータを抽出し, Google Apps Script 経由でスプレッドシートに集約するFirefoxアドオンです.
 (ソースコードを修正すればChrome等でも動くと思いますが未検証です. 少なくとも, Releases ページにあるXPIファイルはFirefox用です.)
 
 ## インストール方法
@@ -27,7 +27,7 @@ Releases ページから最新の `xpi` ファイルをダウンロードしま�
 
 ## 使い方
 
-1. 対応サイトを開きます.
+1. [対応サイト](#対応サイト) を開きます.
 2. ページ上でコンテキストメニューを開き, "ラウンチ PointBridge" を選択します.
 3. ポップアップが表示され, データが抽出されます.
 4. 内容を確認し, "GASへプッシュ" ボタンを押します.
@@ -39,6 +39,7 @@ Releases ページから最新の `xpi` ファイルをダウンロードしま�
 
 - [WESTERポイント照会](https://wester.jr-odekake.net/)
 - [楽天PointClub](https://point.rakuten.co.jp/)
+- [au Ponta ポータル](https://point-portal.auone.jp/)
 
 ## 免責事項
 

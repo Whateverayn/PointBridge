@@ -4,20 +4,52 @@ document.addEventListener('DOMContentLoaded', async () => {
     const status = document.getElementById('status');
 
     const autoSendCheckbox = document.getElementById('autoSend');
+    const includePontaManagementCheckbox = document.getElementById('includePontaManagement');
 
     // Load saved settings
-    const { gasUrl, autoSend } = await chrome.storage.local.get(['gasUrl', 'autoSend']);
-    if (gasUrl) {
-        gasUrlInput.value = gasUrl;
+    const storedData = await chrome.storage.local.get(['gasUrl', 'autoSend', 'includePontaManagement']);
+    const initialSettings = {
+        gasUrl: storedData.gasUrl || '',
+        autoSend: !!storedData.autoSend,
+        includePontaManagement: !!storedData.includePontaManagement
+    };
+
+    if (initialSettings.gasUrl) {
+        gasUrlInput.value = initialSettings.gasUrl;
     }
-    if (autoSend) {
-        autoSendCheckbox.checked = autoSend;
+    autoSendCheckbox.checked = initialSettings.autoSend;
+    includePontaManagementCheckbox.checked = initialSettings.includePontaManagement;
+
+    // Check for changes
+    function updateButtonState() {
+        const currentGasUrl = gasUrlInput.value.trim();
+        const currentAutoSend = autoSendCheckbox.checked;
+        const currentIncludePontaManagement = includePontaManagementCheckbox.checked;
+
+        const hasChanges = (currentGasUrl !== initialSettings.gasUrl) ||
+            (currentAutoSend !== initialSettings.autoSend) ||
+            (currentIncludePontaManagement !== initialSettings.includePontaManagement);
+
+        saveBtn.disabled = !hasChanges;
+
+        if (hasChanges) {
+            status.textContent = "アンセーブド・チェンジがあります. セーブ・プリーズ.";
+            status.style.color = "blue";
+        } else {
+            status.textContent = "レディ";
+            status.style.color = "var(--text-color)";
+        }
     }
+
+    gasUrlInput.addEventListener('input', updateButtonState);
+    autoSendCheckbox.addEventListener('change', updateButtonState);
+    includePontaManagementCheckbox.addEventListener('change', updateButtonState);
 
     // Save settings
     saveBtn.addEventListener('click', async () => {
         const url = gasUrlInput.value.trim();
         const isAutoSend = autoSendCheckbox.checked;
+        const isIncludePontaManagement = includePontaManagementCheckbox.checked;
 
         if (!url) {
             showStatus("URLのインプットがリクワイアされています.", "var(--danger-color)");
@@ -33,8 +65,16 @@ document.addEventListener('DOMContentLoaded', async () => {
         try {
             await chrome.storage.local.set({
                 gasUrl: url,
-                autoSend: isAutoSend
+                autoSend: isAutoSend,
+                includePontaManagement: isIncludePontaManagement
             });
+
+            // Update initial settings on save
+            initialSettings.gasUrl = url;
+            initialSettings.autoSend = isAutoSend;
+            initialSettings.includePontaManagement = isIncludePontaManagement;
+            updateButtonState();
+
             showStatus("コンフィグレーションのセーブは完了されました.", "var(--success-color)");
         } catch (e) {
             showStatus("セーブ・プロセス中に, アンエクスペクテッド・エラーがオカーしました.", "var(--danger-color)");

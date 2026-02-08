@@ -5,7 +5,8 @@ const MENU_ID = "point-bridge-start";
 // Supported sites for action click
 const SUPPORTED_URLS = [
     "*://icoca.jr-odekake.net/pc/pointref_search.do*",
-    "*://point.rakuten.co.jp/history/*"
+    "*://point.rakuten.co.jp/history/*",
+    "https://www.point-portal.auone.jp/point/history*"
 ];
 
 chrome.runtime.onInstalled.addListener(() => {

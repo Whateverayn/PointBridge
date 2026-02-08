@@ -3,6 +3,7 @@
 
 <head>
     <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>PointBridge プリファレンス</title>
     <link rel="stylesheet" href="https://unpkg.com/98.css">
     <style>
@@ -17,7 +18,9 @@
         }
 
         .window {
-            width: 400px;
+            min-width: 400px;
+            width: calc(100% - 96px);
+            margin: 48px auto;
         }
 
         .field-row-stacked {
@@ -31,6 +34,10 @@
 
         .status-bar {
             margin-top: 10px;
+        }
+
+        fieldset {
+            margin-bottom: 12px;
         }
     </style>
 </head>
@@ -49,21 +56,31 @@
             <p>
                 <img src="https://win98icons.alexmeub.com/icons/png/network_internet_pcs_installer-0.png"
                     style="vertical-align: middle; margin-right: 5px;">
-                GASのエンドポイントをコンフィグレーションします
+                PointBridge をコンフィグレーションします
             </p>
 
-            <div class="field-row-stacked">
-                <label for="gasUrl">Web App URL:</label>
-                <input type="text" id="gasUrl" placeholder="https://script.google.com/..." />
-            </div>
+            <fieldset>
+                <legend>Google Apps Script</legend>
+                <div class="field-row-stacked">
+                    <label for="gasUrl">Web App URL:</label>
+                    <input type="text" id="gasUrl" placeholder="https://script.google.com/..." />
+                </div>
+                <div class="field-row">
+                    <input type="checkbox" id="autoSend">
+                    <label for="autoSend">オート・プッシュをイネーブル</label>
+                </div>
+            </fieldset>
 
-            <div class="field-row">
-                <input type="checkbox" id="autoSend">
-                <label for="autoSend">オート・プッシュをイネーブル</label>
-            </div>
+            <fieldset>
+                <legend>Ponta</legend>
+                <div class="field-row">
+                    <input type="checkbox" id="includePontaManagement">
+                    <label for="includePontaManagement">"ａｕ　ＰＡＹ　ポイント運用" をインクルード</label>
+                </div>
+            </fieldset>
 
             <section class="field-row" style="justify-content: flex-end;">
-                <button class="default" id="saveBtn">OK</button>
+                <button class="default" id="saveBtn" disabled>セーブ</button>
             </section>
         </div>
         <div class="status-bar">

@@ -10,6 +10,11 @@
             className: 'WesterParser'
         },
         {
+            name: 'Ponta',
+            url: chrome.runtime.getURL('parsers/ponta/parser.js'),
+            className: 'PontaParser'
+        },
+        {
             name: 'Rakuten',
             url: chrome.runtime.getURL('parsers/rakuten/parser.js'),
             className: 'RakutenParser'
@@ -19,6 +24,12 @@
     // Static loading to avoid "Unsafe call to import" warning
     let parserInstance = null;
     const currentUrl = window.location.href;
+
+    // Fetch generic options
+    const { includePontaManagement } = await chrome.storage.local.get(['includePontaManagement']);
+    const parserOptions = {
+        includePontaManagement: !!includePontaManagement
+    };
 
     try {
         // Wester
@@ -31,6 +42,12 @@
         else if (currentUrl.includes('point.rakuten.co.jp')) {
             const module = await import(chrome.runtime.getURL('parsers/rakuten/parser.js'));
             const p = new module.RakutenParser();
+            if (p.isApplicable(currentUrl)) parserInstance = p;
+        }
+        // Ponta
+        else if (currentUrl.includes('point-portal.auone.jp/point/history')) {
+            const module = await import(chrome.runtime.getURL('parsers/ponta/parser.js'));
+            const p = new module.PontaParser(parserOptions);
             if (p.isApplicable(currentUrl)) parserInstance = p;
         }
     } catch (e) {

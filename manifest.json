@@ -1,7 +1,7 @@
 {
     "manifest_version": 3,
     "name": "PointBridge",
-    "version": "1.1.1",
+    "version": "1.2.0",
     "icons": {
         "48": "icons/icon-48.png",
         "96": "icons/icon-96.png",
@@ -47,13 +47,15 @@
             "resources": [
                 "parsers/interface.js",
                 "parsers/wester/parser.js",
+                "parsers/ponta/parser.js",
                 "parsers/rakuten/parser.js",
                 "content_scripts/ui.html",
                 "icons/icon-svg.svg"
             ],
             "matches": [
                 "*://icoca.jr-odekake.net/*",
-                "*://point.rakuten.co.jp/*"
+                "*://point.rakuten.co.jp/*",
+                "https://www.point-portal.auone.jp/*"
             ]
         }
     ]
