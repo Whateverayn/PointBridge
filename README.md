@@ -40,6 +40,7 @@ Releases ページから最新の `xpi` ファイルをダウンロードしま�
 - [WESTERポイント照会](https://wester.jr-odekake.net/)
 - [楽天PointClub](https://point.rakuten.co.jp/)
 - [au Ponta ポータル](https://point-portal.auone.jp/)
+- [Vポイント](https://mypage.tsite.jp/)
 
 ## 免責事項
 
