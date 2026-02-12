@@ -5,13 +5,15 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     const autoSendCheckbox = document.getElementById('autoSend');
     const includePontaManagementCheckbox = document.getElementById('includePontaManagement');
+    const includeVPointInvestmentCheckbox = document.getElementById('includeVPointInvestment');
 
     // Load saved settings
-    const storedData = await chrome.storage.local.get(['gasUrl', 'autoSend', 'includePontaManagement']);
+    const storedData = await chrome.storage.local.get(['gasUrl', 'autoSend', 'includePontaManagement', 'includeVPointInvestment']);
     const initialSettings = {
         gasUrl: storedData.gasUrl || '',
         autoSend: !!storedData.autoSend,
-        includePontaManagement: !!storedData.includePontaManagement
+        includePontaManagement: !!storedData.includePontaManagement,
+        includeVPointInvestment: !!storedData.includeVPointInvestment
     };
 
     if (initialSettings.gasUrl) {
@@ -19,16 +21,19 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
     autoSendCheckbox.checked = initialSettings.autoSend;
     includePontaManagementCheckbox.checked = initialSettings.includePontaManagement;
+    includeVPointInvestmentCheckbox.checked = initialSettings.includeVPointInvestment;
 
     // Check for changes
     function updateButtonState() {
         const currentGasUrl = gasUrlInput.value.trim();
         const currentAutoSend = autoSendCheckbox.checked;
         const currentIncludePontaManagement = includePontaManagementCheckbox.checked;
+        const currentIncludeVPointInvestment = includeVPointInvestmentCheckbox.checked;
 
         const hasChanges = (currentGasUrl !== initialSettings.gasUrl) ||
             (currentAutoSend !== initialSettings.autoSend) ||
-            (currentIncludePontaManagement !== initialSettings.includePontaManagement);
+            (currentIncludePontaManagement !== initialSettings.includePontaManagement) ||
+            (currentIncludeVPointInvestment !== initialSettings.includeVPointInvestment);
 
         saveBtn.disabled = !hasChanges;
 
@@ -44,12 +49,14 @@ document.addEventListener('DOMContentLoaded', async () => {
     gasUrlInput.addEventListener('input', updateButtonState);
     autoSendCheckbox.addEventListener('change', updateButtonState);
     includePontaManagementCheckbox.addEventListener('change', updateButtonState);
+    includeVPointInvestmentCheckbox.addEventListener('change', updateButtonState);
 
     // Save settings
     saveBtn.addEventListener('click', async () => {
         const url = gasUrlInput.value.trim();
         const isAutoSend = autoSendCheckbox.checked;
         const isIncludePontaManagement = includePontaManagementCheckbox.checked;
+        const isIncludeVPointInvestment = includeVPointInvestmentCheckbox.checked;
 
         if (!url) {
             showStatus("URLのインプットがリクワイアされています.", "var(--danger-color)");
@@ -66,13 +73,15 @@ document.addEventListener('DOMContentLoaded', async () => {
             await chrome.storage.local.set({
                 gasUrl: url,
                 autoSend: isAutoSend,
-                includePontaManagement: isIncludePontaManagement
+                includePontaManagement: isIncludePontaManagement,
+                includeVPointInvestment: isIncludeVPointInvestment
             });
 
             // Update initial settings on save
             initialSettings.gasUrl = url;
             initialSettings.autoSend = isAutoSend;
             initialSettings.includePontaManagement = isIncludePontaManagement;
+            initialSettings.includeVPointInvestment = isIncludeVPointInvestment;
             updateButtonState();
 
             showStatus("コンフィグレーションのセーブは完了されました.", "var(--success-color)");

@@ -110,6 +110,11 @@ class PointBridgeUI {
                     name: 'Rakuten',
                     url: chrome.runtime.getURL('parsers/rakuten/parser.js'),
                     className: 'RakutenParser'
+                },
+                {
+                    name: 'VPoint',
+                    url: chrome.runtime.getURL('parsers/vpoint/parser.js'),
+                    className: 'VPointParser'
                 }
             ];
 
@@ -118,9 +123,10 @@ class PointBridgeUI {
             let parser = null;
 
             // Fetch generic options (currently just Ponta management preference)
-            const { includePontaManagement } = await chrome.storage.local.get(['includePontaManagement']);
+            const { includePontaManagement, includeVPointInvestment } = await chrome.storage.local.get(['includePontaManagement', 'includeVPointInvestment']);
             const parserOptions = {
-                includePontaManagement: !!includePontaManagement
+                includePontaManagement: !!includePontaManagement,
+                includeVPointInvestment: !!includeVPointInvestment
             };
 
             try {
@@ -135,6 +141,10 @@ class PointBridgeUI {
                 } else if (currentUrl.includes('point-portal.auone.jp/point/history')) {
                     const module = await import(chrome.runtime.getURL('parsers/ponta/parser.js'));
                     const candidate = new module.PontaParser(parserOptions);
+                    if (candidate.isApplicable(currentUrl)) parser = candidate;
+                } else if (currentUrl.includes('mypage.tsite.jp')) {
+                    const module = await import(chrome.runtime.getURL('parsers/vpoint/parser.js'));
+                    const candidate = new module.VPointParser(parserOptions);
                     if (candidate.isApplicable(currentUrl)) parser = candidate;
                 }
             } catch (e) {

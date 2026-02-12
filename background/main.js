@@ -6,17 +6,20 @@ const MENU_ID = "point-bridge-start";
 const SUPPORTED_URLS = [
     "*://icoca.jr-odekake.net/pc/pointref_search.do*",
     "*://point.rakuten.co.jp/history/*",
-    "https://www.point-portal.auone.jp/point/history*"
+    "https://www.point-portal.auone.jp/point/history*",
+    "https://mypage.tsite.jp/*"
 ];
 
 chrome.runtime.onInstalled.addListener(() => {
     // console.log("PointBridge Installed.");
 
-    chrome.contextMenus.create({
-        id: MENU_ID,
-        title: "ラウンチ PointBridge",
-        contexts: ["page", "selection"],
-        documentUrlPatterns: SUPPORTED_URLS
+    chrome.contextMenus.removeAll(() => {
+        chrome.contextMenus.create({
+            id: MENU_ID,
+            title: "ラウンチ PointBridge",
+            contexts: ["page", "selection"],
+            documentUrlPatterns: SUPPORTED_URLS
+        });
     });
 });
 
