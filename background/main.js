@@ -11,15 +11,19 @@ const SUPPORTED_URLS = [
 ];
 
 chrome.runtime.onInstalled.addListener(() => {
-    // console.log("PointBridge Installed.");
-
-    chrome.contextMenus.removeAll(() => {
-        chrome.contextMenus.create({
-            id: MENU_ID,
-            title: "ラウンチ PointBridge",
-            contexts: ["page", "selection"],
-            documentUrlPatterns: SUPPORTED_URLS
-        });
+    chrome.contextMenus.create({
+        id: MENU_ID,
+        title: "ラウンチ PointBridge",
+        contexts: ["page", "selection"],
+        documentUrlPatterns: SUPPORTED_URLS
+    }, () => {
+        // Ignore error if item already exists, but try to update it to ensure latest URL patterns
+        if (chrome.runtime.lastError) {
+            // console.log("Menu already exists, updating...");
+            chrome.contextMenus.update(MENU_ID, {
+                documentUrlPatterns: SUPPORTED_URLS
+            });
+        }
     });
 });
 
